@@ -35,6 +35,11 @@
     },
     "success_url": "https://t.me/kastaid",
     "stack": "container",
+    "formation": {
+        "worker": {
+            "quantity": 1
+        }
+    },
     "addons": [
         {
             "plan": "heroku-postgresql",
