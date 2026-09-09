@@ -1,4 +1,4 @@
-# getter
+# Getter
 
 **A powerful and customizable Telegram userbot built with Telethon. Create custom plugins, automate tasks, and enhance your Telegram experience.**
 
@@ -25,6 +25,7 @@
   - [Locally](#locally)
   - [Heroku](#heroku)
 - [Usage](#usage)
+- [Update](#update)
 - [Custom Plugins](#custom-plugins)
 - [Supports](#supports)
 - [Contributing](#contributing)
@@ -38,7 +39,7 @@
 
 ## Quick Start
 
-Follow these steps to set up and run **getter** on your system.
+Follow these steps to set up and run **Getter** on your system.
 
 ### Clone Repository
 
@@ -102,15 +103,30 @@ docker compose -f lite-compose.yml restart
 
 ### Locally
 
-Run getter locally on your machine or server (e.g., on Termux).
+Run Getter locally on your machine or server (e.g., on Termux).
+
+We recommend using [uv](https://docs.astral.sh/uv/) for faster and more reliable Python package management.
 
 #### Production
+Using uv:
+```sh
+uv pip install -r requirements.txt
+python3 -m getter
+```
+Using pip:
 ```sh
 pip3 install -r requirements.txt
 python3 -m getter
 ```
 
 #### Development
+Using uv:
+```sh
+uv pip install -r requirements.txt
+uv pip install -r requirements-dev.txt
+python3 -m run --watch
+```
+Using pip:
 ```sh
 pip3 install -r requirements.txt
 pip3 install -r requirements-dev.txt
@@ -127,7 +143,7 @@ Deploy to Heroku with one click using the Container stack:
 
 ## Usage
 
-Once successfully deployed, test your getter by sending `.ping` in any chat.
+Once successfully deployed, test your Getter by sending `.ping` in any chat.
 
 **Command prefix**:
 
@@ -136,6 +152,26 @@ Once successfully deployed, test your getter by sending `.ping` in any chat.
 - If `NO_HANDLER` is set to `True`, send commands without any prefix (e.g., `ping`)
 
 **Get all commands**: `.help` - This will show you all available plugins, commands, and how to use them.
+
+## Update
+
+Getter supports updating directly through Telegram or Git.
+
+To update directly from your Telegram account, run this command in any chat:
+```sh
+.help updater
+```
+Then choose the update option to check for updates, view changelog, or update Getter.
+
+For manual updates using Git:
+```sh
+git pull
+```
+If you updated from an older version and experience errors, fix your local repo with:
+```sh
+git fetch origin && git reset --hard origin/main
+```
+This is **NOT** required for fresh installs.
 
 ## Custom Plugins
 
