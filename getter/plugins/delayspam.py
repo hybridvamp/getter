@@ -8,9 +8,13 @@ import re
 
 from telethon.errors import (
     BadRequestError,
+    ChannelInvalidError,
+    ChannelPrivateError,
+    ChatWriteForbiddenError,
     FloodPremiumWaitError,
     FloodWaitError,
     SlowModeWaitError,
+    UserBannedInChannelError,
 )
 
 from . import (
@@ -92,12 +96,9 @@ async def _(kst):
         return await kst.eor("Invalid target chat.", time=3)
     ds = int(kst.pattern_match.group(1) or 0)
     ds_name = get_ds_name(ds)
-    task_store = get_task_store(ds)
-    if chat_id not in task_store:
+    if chat_id not in get_task_store(ds):
         return await kst.eor(f"No {ds_name} is running in target chat.", time=3)
-    task = task_store.pop(chat_id)
-    if not task.done():
-        task.cancel()
+    delete_task(ds, chat_id)
     await kst.eor(f"`canceled {ds_name} in target chat`", time=6)
 
 
@@ -107,12 +108,7 @@ async def _(kst):
 async def _(kst):
     ds = int(kst.pattern_match.group(1) or 0)
     ds_name = get_ds_name(ds)
-    task_store = get_task_store(ds)
-    count = len(task_store)
-    for task in list(task_store.values()):
-        if not task.done():
-            task.cancel()
-    task_store.clear()
+    count = stop_task(ds)
     await kst.eor(f"`stopped {ds_name} in all chats: {count} tasks`", time=0)
 
 
@@ -120,12 +116,7 @@ async def _(kst):
     pattern="dsclear$",
 )
 async def _(kst):
-    count = sum(len(store) for store in DS_TASKS.values())
-    for store in DS_TASKS.values():
-        for task in list(store.values()):
-            if not task.done():
-                task.cancel()
-        store.clear()
+    count = clear_task()
     await kst.eor(f"`cleared all ds*: {count} tasks`", time=0)
 
 
@@ -135,6 +126,37 @@ def get_ds_name(ds: int) -> str:
 
 def get_task_store(ds: int) -> dict[int, asyncio.Task]:
     return DS_TASKS[ds]
+
+
+def delete_task(
+    ds: int,
+    chat_id: int,
+) -> None:
+    task = get_task_store(ds).pop(chat_id, None)
+    if task and not task.done():
+        task.cancel()
+
+
+def stop_task(ds: int) -> int:
+    count = 0
+    task_store = get_task_store(ds)
+    for task in list(task_store.values()):
+        if not task.done():
+            task.cancel()
+        count += 1
+    task_store.clear()
+    return count
+
+
+def clear_task() -> int:
+    count = 0
+    for store in DS_TASKS.values():
+        count += len(store)
+        for task in list(store.values()):
+            if not task.done():
+                task.cancel()
+        store.clear()
+    return count
 
 
 async def run_ds(
@@ -172,7 +194,6 @@ async def run_ds(
                     link_preview=False,
                     silent=True,
                 )
-
             error_count = 0
             await asyncio.sleep(delay)
         except SlowModeWaitError as err:
@@ -185,10 +206,20 @@ async def run_ds(
             wait = err.seconds + random.uniform(15, 30)
             kst.client.log.warning(f"Delayspam {ds} flood wait: {err.seconds}s, sleeping {wait:.1f}s")
             await asyncio.sleep(wait)
+        except (
+            ChannelInvalidError,
+            ChannelPrivateError,
+            ChatWriteForbiddenError,
+            UserBannedInChannelError,
+        ) as err:
+            kst.client.log.warning(f"Delayspam {get_ds_name(ds)} stopped in chat {chat_id}: {err}")
+            delete_task(ds, chat_id)
+            break
         except Exception as err:
             error_count += 1
             if error_count > DS_ERROR_MAX:
                 kst.client.log.warning(f"Delayspam {ds} stopped after {error_count} errors in chat {chat_id}: {err}")
+                delete_task(ds, chat_id)
                 break
 
 
