@@ -7,6 +7,7 @@ import random
 import re
 
 from telethon.errors import (
+    BadRequestError,
     FloodPremiumWaitError,
     FloodWaitError,
     SlowModeWaitError,
@@ -107,23 +108,25 @@ async def _(kst):
     ds = int(kst.pattern_match.group(1) or 0)
     ds_name = get_ds_name(ds)
     task_store = get_task_store(ds)
+    count = len(task_store)
     for task in list(task_store.values()):
         if not task.done():
             task.cancel()
     task_store.clear()
-    await kst.eor(f"`stopped {ds_name} in all chats`", time=0)
+    await kst.eor(f"`stopped {ds_name} in all chats: {count} tasks`", time=0)
 
 
 @kasta_cmd(
     pattern="dsclear$",
 )
 async def _(kst):
+    count = sum(len(store) for store in DS_TASKS.values())
     for store in DS_TASKS.values():
         for task in list(store.values()):
             if not task.done():
                 task.cancel()
         store.clear()
-    await kst.eor("`clear all ds*`", time=0)
+    await kst.eor(f"`cleared all ds*: {count} tasks`", time=0)
 
 
 def get_ds_name(ds: int) -> str:
@@ -131,7 +134,7 @@ def get_ds_name(ds: int) -> str:
 
 
 def get_task_store(ds: int) -> dict[int, asyncio.Task]:
-    return DS_TASKS.get(ds)
+    return DS_TASKS[ds]
 
 
 async def run_ds(
@@ -143,19 +146,33 @@ async def run_ds(
     count: int,
 ) -> None:
     error_count = 0
+    disable_link_preview = False
     for _ in range(count):
         if chat_id not in get_task_store(ds):
             break
         try:
             if delay > DS_RANDOM_THRESHOLD:
                 await asyncio.sleep(random.uniform(*DS_RANDOM_DELAY))
-            await kst.client.send_message(
-                chat_id,
-                message=message,
-                parse_mode="markdown",
-                link_preview=True,
-                silent=True,
-            )
+            try:
+                await kst.client.send_message(
+                    chat_id,
+                    message=message,
+                    parse_mode="markdown",
+                    link_preview=not disable_link_preview,
+                    silent=True,
+                )
+            except BadRequestError as err:
+                if err.message != "CHAT_SEND_WEBPAGE_FORBIDDEN":
+                    raise
+                disable_link_preview = True
+                await kst.client.send_message(
+                    chat_id,
+                    message=message,
+                    parse_mode="markdown",
+                    link_preview=False,
+                    silent=True,
+                )
+
             error_count = 0
             await asyncio.sleep(delay)
         except SlowModeWaitError as err:
